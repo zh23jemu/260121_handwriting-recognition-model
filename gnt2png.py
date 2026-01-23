@@ -15,10 +15,10 @@ def read_from_gnt_dir(gnt_dir=train_data_dir):
         while True:
             header = np.fromfile(f, dtype='uint8', count=header_size)
             if not header.size: break
-            sample_size = header[0] + (header[1] << 8) + (header[2] << 16) + (header[3] << 24)
-            tagcode = header[5] + (header[4] << 8)
-            width = header[6] + (header[7] << 8)
-            height = header[8] + (header[9] << 8)
+            sample_size = int(header[0]) + (int(header[1]) << 8) + (int(header[2]) << 16) + (int(header[3]) << 24)
+            tagcode = int(header[5]) + (int(header[4]) << 8)
+            width = int(header[6]) + (int(header[7]) << 8)
+            height = int(header[8]) + (int(header[9]) << 8)
             if header_size + width * height != sample_size:
                 break
             image = np.fromfile(f, dtype='uint8', count=width * height).reshape((height, width))
