@@ -1,1 +1,7 @@
 dataset/
+data/
+wordDatas/
+nul
+__pycache__/
+handwriting_project/media/recognition/images/
+handwriting_project/media/recognition/preprocessed/

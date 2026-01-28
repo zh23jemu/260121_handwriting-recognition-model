@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>检查前端Token状态</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .token-info {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #667eea;
+        }
+        .button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background: #5568d3;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>检查前端Token状态</h1>
+        
+        <div id="token-status" class="token-info">
+            <h3>Token状态</h3>
+            <div id="token-content"></div>
+        </div>
+        
+        <div id="login-form" class="token-info">
+            <h3>登录测试</h3>
+            <input type="text" id="username" placeholder="用户名" value="admin">
+            <input type="password" id="password" placeholder="密码" value="admin123">
+            <button class="button" onclick="loginTest()">测试登录</button>
+            <div id="login-result"></div>
+        </div>
+        
+        <div id="recognition-test" class="token-info">
+            <h3>识别测试</h3>
+            <button class="button" onclick="testRecognition()">测试识别</button>
+            <div id="recognition-result"></div>
+        </div>
+        
+        <div class="token-info">
+            <h3>操作</h3>
+            <button class="button" onclick="clearLocalStorage()">清除LocalStorage</button>
+            <button class="button" onclick="refreshPage()">刷新页面</button>
+        </div>
+    </div>
+    
+    <script>
+        // 检查localStorage中的token
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username');
+            const isAdmin = localStorage.getItem('isAdmin');
+            
+            const tokenContent = document.getElementById('token-content');
+            let html = '';
+            
+            if (token) {
+                html += '<p class="success">Token存在</p>';
+                html += `<p>Token长度: ${token.length}</p>`;
+                html += `<p>Token前20字符: ${token.substring(0, 20)}...</p>`;
+            } else {
+                html += '<p class="error">Token不存在</p>';
+            }
+            
+            if (username) {
+                html += `<p>用户名: ${username}</p>`;
+            } else {
+                html += '<p class="error">用户名不存在</p>';
+            }
+            
+            if (isAdmin) {
+                html += `<p>是否管理员: ${isAdmin}</p>`;
+            }
+            
+            tokenContent.innerHTML = html;
+        }
+        
+        // 测试登录
+        async function loginTest() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('login-result');
+            
+            resultDiv.innerHTML = '<p>登录中...</p>';
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/auth/login/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // 保存到localStorage
+                    localStorage.setItem('token', data.access);
+                    localStorage.setItem('username', username);
+                    localStorage.setItem('isAdmin', 'true');
+                    
+                    resultDiv.innerHTML = '<p class="success">登录成功，Token已保存到localStorage</p>';
+                    checkToken();
+                } else {
+                    resultDiv.innerHTML = `<p class="error">登录失败: ${data.detail || '未知错误'}</p>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 测试识别
+        async function testRecognition() {
+            const token = localStorage.getItem('token');
+            const resultDiv = document.getElementById('recognition-result');
+            
+            if (!token) {
+                resultDiv.innerHTML = '<p class="error">Token不存在，请先登录</p>';
+                return;
+            }
+            
+            resultDiv.innerHTML = '<p>测试识别中...</p>';
+            
+            try {
+                // 创建一个简单的测试图像
+                const canvas = document.createElement('canvas');
+                canvas.width = 100;
+                canvas.height = 100;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, 100, 100);
+                ctx.fillStyle = '#000000';
+                ctx.font = '40px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('一', 50, 50);
+                
+                // 转换为blob
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('image', blob, 'test.png');
+                    
+                    const response = await fetch('http://localhost:8000/api/recognition/recognize/', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        resultDiv.innerHTML = `<p class="success">识别成功</p>
+                        <p>结果: ${data.result}</p>
+                        <p>置信度: ${(data.confidence * 100).toFixed(2)}%</p>`;
+                    } else {
+                        resultDiv.innerHTML = `<p class="error">识别失败: ${data.error || '未知错误'}</p>`;
+                    }
+                }, 'image/png');
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">请求失败: ${error.message}</p>`;
+            }
+        }
+        
+        // 清除localStorage
+        function clearLocalStorage() {
+            localStorage.clear();
+            alert('LocalStorage已清除');
+            checkToken();
+        }
+        
+        // 刷新页面
+        function refreshPage() {
+            location.reload();
+        }
+        
+        // 页面加载时检查token
+        window.onload = checkToken;
+    </script>
+</body>
+</html>
