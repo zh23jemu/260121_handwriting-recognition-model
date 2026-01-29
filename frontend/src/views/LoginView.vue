@@ -68,8 +68,8 @@ export default {
         localStorage.setItem('username', user.username)
         localStorage.setItem('isAdmin', user.is_admin.toString())
         
-        // 跳转到识别页面
-        this.$router.push('/recognition')
+        // 跳转到欢迎页面
+        this.$router.push('/')
       } catch (err) {
         this.error = err.response?.data?.detail || '登录失败，请检查用户名和密码'
       } finally {
