@@ -4,6 +4,7 @@
       <h1>手写汉字识别</h1>
       <div class="user-info">
         <span>欢迎，{{ username }}</span>
+        <router-link v-if="isAdmin" to="/admin" class="btn btn-primary">管理员控制台</router-link>
         <button class="btn btn-secondary" @click="handleLogout">退出登录</button>
       </div>
     </header>
@@ -106,6 +107,7 @@ export default {
   data() {
     return {
       username: localStorage.getItem('username') || '用户',
+      isAdmin: localStorage.getItem('isAdmin') === 'true',
       isDrawing: false,
       isRecognizing: false,
       recognitionResult: null,

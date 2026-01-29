@@ -39,11 +39,11 @@
             <h3>模型训练</h3>
             <p>训练和评估模型性能</p>
           </router-link>
-          <div class="action-card">
+          <router-link to="/user-management" class="action-card">
             <div class="action-icon">👥</div>
             <h3>用户管理</h3>
             <p>管理系统用户</p>
-          </div>
+          </router-link>
           <div class="action-card">
             <div class="action-icon">📊</div>
             <h3>系统统计</h3>
@@ -76,13 +76,8 @@ export default {
   },
   methods: {
     loadSystemStats() {
-      // 模拟加载系统统计数据
-      setTimeout(() => {
-        this.userCount = 123
-        this.recordCount = 4567
-        this.todayRecords = 89
-        this.avgAccuracy = 92.5
-      }, 500)
+      // 加载真实系统统计数据
+      // 暂时保持为空，后续可添加API调用
     },
     handleLogout() {
       // 清除本地存储

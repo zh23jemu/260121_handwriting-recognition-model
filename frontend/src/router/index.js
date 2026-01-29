@@ -6,6 +6,7 @@ import RecognitionView from '../views/RecognitionView.vue'
 import HistoryView from '../views/HistoryView.vue'
 import AdminView from '../views/AdminView.vue'
 import ModelTrainingView from '../views/ModelTrainingView.vue'
+import UserManagementView from '../views/UserManagementView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -47,6 +48,12 @@ const router = createRouter({
       path: '/model-training',
       name: 'model-training',
       component: ModelTrainingView,
+      meta: { requiresAuth: true, requiresAdmin: true }
+    },
+    {
+      path: '/user-management',
+      name: 'user-management',
+      component: UserManagementView,
       meta: { requiresAuth: true, requiresAdmin: true }
     }
   ]

@@ -3,6 +3,9 @@
     <header class="app-header">
       <h1>识别历史记录</h1>
       <div class="header-actions">
+        <router-link v-if="isAdmin" to="/admin" class="btn btn-primary">
+          <span class="btn-icon">⚙️</span> 管理员控制台
+        </router-link>
         <button class="btn btn-primary" @click="exportHistory">
           <span class="btn-icon">📥</span> 导出CSV
         </button>
@@ -150,7 +153,8 @@ export default {
       isLoading: false,
       isDeleting: false,
       previewImageUrl: '',
-      error: ''
+      error: '',
+      isAdmin: localStorage.getItem('isAdmin') === 'true'
     }
   },
   computed: {

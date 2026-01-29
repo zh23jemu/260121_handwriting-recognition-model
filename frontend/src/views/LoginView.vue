@@ -66,7 +66,7 @@ export default {
         // 保存登录状态
         localStorage.setItem('token', access)
         localStorage.setItem('username', user.username)
-        localStorage.setItem('isAdmin', user.is_admin)
+        localStorage.setItem('isAdmin', user.is_admin.toString())
         
         // 跳转到识别页面
         this.$router.push('/recognition')
