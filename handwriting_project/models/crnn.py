@@ -74,14 +74,8 @@ class CRNN(nn.Module):
         Returns:
             输出特征，形状为 (seq_len, batch_size, num_classes)
         """
-        # 打印输入尺寸
-        print(f"Input size: {x.size()}")
-        
         # 卷积特征提取
         conv_out = self.cnn(x)
-        
-        # 打印CNN输出尺寸
-        print(f"CNN output size: {conv_out.size()}")
         
         # 调整维度以适应LSTM输入
         # conv_out形状: (batch_size, channels, height, width)
@@ -89,26 +83,20 @@ class CRNN(nn.Module):
         
         # 计算LSTM输入维度
         lstm_input_size = channels * height
-        print(f"LSTM input size: {lstm_input_size}")
         
         # 将height和channels合并，作为序列长度
         # 输出形状: (width, batch_size, channels * height)
         rnn_in = conv_out.permute(3, 0, 1, 2)
         rnn_in = rnn_in.contiguous().view(width, batch_size, -1)
         
-        # 打印RNN输入尺寸
-        print(f"RNN input size: {rnn_in.size()}")
-        
         # 动态初始化LSTM层
         if not self.lstm_initialized:
-            print("Initializing LSTM layers...")
             # 根据实际输入维度创建LSTM层
             self.lstm1 = nn.LSTM(lstm_input_size, 256, bidirectional=True, batch_first=False)
             # 将模型移动到正确的设备
             device = next(self.parameters()).device
             self.lstm1 = self.lstm1.to(device)
             self.lstm_initialized = True
-            print("LSTM layers initialized successfully")
         
         # 循环特征提取
         rnn_out1, _ = self.lstm1(rnn_in)
