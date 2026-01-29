@@ -5,3 +5,5 @@ nul
 __pycache__/
 handwriting_project/media/recognition/images/
 handwriting_project/media/recognition/preprocessed/
+data_common/
+data_other/
