@@ -2,24 +2,7 @@
   <div class="home-container">
     <!-- 已登录用户的欢迎页面 -->
     <div v-if="isAuthenticated" class="welcome-container">
-      <header class="welcome-header">
-        <div class="header-left">
-          <h1>手写汉字识别</h1>
-        </div>
-        <div class="header-right">
-          <nav class="main-nav">
-            <router-link to="/" class="nav-item active">首页</router-link>
-            <router-link to="/recognition" class="nav-item">识别</router-link>
-            <router-link to="/history" class="nav-item">历史</router-link>
-            <router-link to="/admin" v-if="isAdmin" class="nav-item">统计</router-link>
-            <router-link to="/profile" class="nav-item">个人中心</router-link>
-          </nav>
-          <div class="user-profile">
-            <span class="username">{{ username }}</span>
-            <button class="btn btn-small btn-secondary" @click="handleLogout">退出</button>
-          </div>
-        </div>
-      </header>
+      <!-- 全局导航已在App.vue中添加 -->
       
       <main class="welcome-main">
         <div class="welcome-section">
@@ -310,8 +293,9 @@ export default {
 
 .welcome-main {
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .welcome-section {

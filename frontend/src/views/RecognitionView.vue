@@ -1,13 +1,6 @@
 <template>
   <div class="recognition-container">
-    <header class="app-header">
-      <h1>手写汉字识别</h1>
-      <div class="user-info">
-        <span>欢迎，{{ username }}</span>
-        <router-link v-if="isAdmin" to="/admin" class="btn btn-primary">管理员控制台</router-link>
-        <button class="btn btn-secondary" @click="handleLogout">退出登录</button>
-      </div>
-    </header>
+    <!-- 全局导航已在App.vue中添加 -->
     
     <main class="recognition-main">
       <div class="recognition-section">
@@ -338,8 +331,9 @@ export default {
 
 .recognition-main {
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .recognition-section {

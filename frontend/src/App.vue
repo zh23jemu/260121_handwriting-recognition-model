@@ -1,9 +1,36 @@
 <template>
   <div class="app-container">
+    <!-- 全局导航 -->
+    <GlobalNav v-if="isAuthenticated" />
+    
     <!-- 路由出口 -->
     <router-view />
   </div>
 </template>
+
+<script>
+import GlobalNav from './components/GlobalNav.vue'
+
+export default {
+  name: 'App',
+  components: {
+    GlobalNav
+  },
+  data() {
+    return {
+      isAuthenticated: false
+    }
+  },
+  mounted() {
+    this.checkAuthStatus()
+  },
+  methods: {
+    checkAuthStatus() {
+      this.isAuthenticated = !!localStorage.getItem('token')
+    }
+  }
+}
+</script>
 
 <style>
 /* 全局样式重置 */

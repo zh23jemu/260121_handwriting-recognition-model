@@ -1,12 +1,6 @@
 <template>
   <div class="admin-container">
-    <header class="app-header">
-      <h1>管理员控制台</h1>
-      <div class="header-actions">
-        <router-link to="/recognition" class="btn btn-secondary">返回识别</router-link>
-        <button class="btn btn-danger" @click="handleLogout">退出登录</button>
-      </div>
-    </header>
+    <!-- 全局导航已在App.vue中添加 -->
     
     <main class="admin-main">
       <div class="admin-dashboard">
@@ -150,8 +144,9 @@ export default {
 
 .admin-main {
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .admin-dashboard, .admin-actions {

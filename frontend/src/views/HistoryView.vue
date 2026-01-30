@@ -1,19 +1,6 @@
 <template>
   <div class="history-container">
-    <header class="app-header">
-      <h1>识别历史记录</h1>
-      <div class="header-actions">
-        <router-link v-if="isAdmin" to="/admin" class="btn btn-primary">
-          <span class="btn-icon">⚙️</span> 管理员控制台
-        </router-link>
-        <button class="btn btn-primary" @click="exportHistory">
-          <span class="btn-icon">📥</span> 导出CSV
-        </button>
-        <router-link to="/recognition" class="btn btn-secondary">
-          <span class="btn-icon">⬅️</span> 返回识别
-        </router-link>
-      </div>
-    </header>
+    <!-- 全局导航已在App.vue中添加 -->
     
     <main class="history-main">
       <div class="filter-section">
@@ -386,8 +373,9 @@ export default {
 
 .history-main {
   padding: 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .filter-section {
