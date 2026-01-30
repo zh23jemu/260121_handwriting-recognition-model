@@ -12,6 +12,7 @@
             <router-link to="/recognition" class="nav-item">识别</router-link>
             <router-link to="/history" class="nav-item">历史</router-link>
             <router-link to="/admin" v-if="isAdmin" class="nav-item">统计</router-link>
+            <router-link to="/profile" class="nav-item">个人中心</router-link>
           </nav>
           <div class="user-profile">
             <span class="username">{{ username }}</span>

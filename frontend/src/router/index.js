@@ -7,6 +7,7 @@ import HistoryView from '../views/HistoryView.vue'
 import AdminView from '../views/AdminView.vue'
 import ModelTrainingView from '../views/ModelTrainingView.vue'
 import UserManagementView from '../views/UserManagementView.vue'
+import ProfileView from '../views/ProfileView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,12 @@ const router = createRouter({
       path: '/history',
       name: 'history',
       component: HistoryView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: ProfileView,
       meta: { requiresAuth: true }
     },
     {
