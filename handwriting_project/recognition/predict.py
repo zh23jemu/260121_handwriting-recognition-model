@@ -34,7 +34,7 @@ class ModelPredictor:
         if model_path is None:
             # 使用绝对路径，确保能正确找到模型文件
             # 直接指定完整的绝对路径
-            model_path = 'C:\\!coding\\260121_handwriting-recognition-model\\handwriting_project\\models\\saved_models\\crnn_final.pth'
+            model_path = r'C:\!coding\260121_handwriting-recognition-model\handwriting_project\models\saved_models\crnn_common_best.pth'
             print(f"Model path: {model_path}")
             print(f"Model file exists: {os.path.exists(model_path)}")
         
