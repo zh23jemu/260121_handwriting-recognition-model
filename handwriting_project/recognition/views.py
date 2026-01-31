@@ -2,21 +2,17 @@ from rest_framework import views, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.core.files.base import ContentFile
-from django.http import HttpResponse
-import csv
-import uuid
 from datetime import datetime
 from PIL import Image
 from io import BytesIO
+import numpy as np
+import cv2
+import base64
+import uuid
+import time
+import easyocr
+import os
 
-from .serializers import (
-    ImageUploadSerializer,
-    ImageBase64Serializer,
-    RecognitionRecordSerializer,
-    RecognitionResultSerializer
-)
-from .preprocessing import ImagePreprocessor
-from .predict import ModelPredictor
 from .models import RecognitionRecord
 
 class ImageRecognitionView(views.APIView):
@@ -28,92 +24,213 @@ class ImageRecognitionView(views.APIView):
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # 初始化模型预测器
-        self.predictor = ModelPredictor()
-        # 初始化图像预处理器
-        self.preprocessor = ImagePreprocessor()
+        # 初始化EasyOCR系统
+        print("Initializing OCR System for handwriting recognition")
+        print("Loading EasyOCR model...")
+        
+        # 尝试初始化EasyOCR
+        try:
+            # 加载EasyOCR模型，使用中文简体
+            # detail=0 返回简化结果格式，更容易解析
+            self.reader = easyocr.Reader(['ch_sim'], gpu=False, verbose=False)
+            print("EasyOCR engine initialized successfully")
+        except Exception as e:
+            print(f"Error: EasyOCR engine initialization failed. Error: {str(e)}")
+            self.reader = None
+        
+        print("OCR system ready for handwriting recognition")
+    
+    def _preprocess_image(self, image):
+        """
+        图像预处理：和app.py一致
+        """
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        image_np = np.array(image)
+        
+        gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+        enhanced = cv2.equalizeHist(blurred)
+        enhanced = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+        
+        return enhanced
+    
+    def _process_ocr_result(self, result):
+        """
+        处理OCR结果
+        
+        Args:
+            result: EasyOCR返回的结果
+            
+        Returns:
+            tuple: (texts, confidences)
+        """
+        texts = []
+        confidences = []
+        
+        if result is None:
+            return texts, confidences
+        
+        try:
+            for item in result:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    text = item[1] if isinstance(item[1], str) else str(item[1])
+                    confidence = float(item[2]) if len(item) > 2 and isinstance(item[2], (int, float, np.floating)) else 0.0
+                    texts.append(text)
+                    confidences.append(confidence)
+        except Exception as e:
+            print(f"Error processing OCR result: {e}")
+        
+        return texts, confidences
     
     def post(self, request, *args, **kwargs):
         """
         处理图像上传和识别请求
         
         Args:
-            request: HTTP请求对象，包含上传的图像和预处理步骤
+            request: HTTP请求对象，包含上传的图像
             
         Returns:
             Response: 包含识别结果的HTTP响应
         """
         # 检查请求类型
-        if 'image' in request.data:
-            # 常规图像上传
-            serializer = ImageUploadSerializer(data=request.data)
-        elif 'image_base64' in request.data:
-            # Base64图像上传
-            serializer = ImageBase64Serializer(data=request.data)
-        else:
+        if 'image' not in request.data:
             return Response(
-                {'error': '请求中缺少image或image_base64字段'}, 
+                {'error': '请求中缺少image字段'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 验证请求数据
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 获取预处理步骤
-        preprocessing_steps = serializer.validated_data.get('preprocessing_steps', None)
-        
-        # 获取图像
-        if 'image' in serializer.validated_data:
-            # 常规图像上传
-            image = Image.open(serializer.validated_data['image'])
-        else:
-            # Base64图像
-            image = serializer.validated_data['image_base64']
-        
         try:
-            # 模型预测（直接使用原始图像，让predict方法自己处理预处理）
-            prediction_result = self.predictor.predict(image)
+            # 获取图像
+            image = Image.open(request.data['image'])
             
-            # 保存原始图像
-            original_image_name = f"original_{uuid.uuid4()}.png"
-            original_image_io = BytesIO()
-            image.save(original_image_io, format='PNG')
-            original_image_content = ContentFile(original_image_io.getvalue(), name=original_image_name)
+            # 图像预处理
+            processed_image = self._preprocess_image(image)
             
-            # 保存预处理后的图像（从prediction_result中获取）
-            preprocessed_image_name = f"preprocessed_{uuid.uuid4()}.png"
-            preprocessed_image_content = None
-            if prediction_result.get('preprocessed_image'):
-                import base64
-                preprocessed_image_data = base64.b64decode(prediction_result['preprocessed_image'])
-                preprocessed_image_content = ContentFile(preprocessed_image_data, name=preprocessed_image_name)
+            # 将预处理后的图像转换为base64编码
+            preprocessed_image_base64 = None
+            try:
+                # 将numpy数组转换回PIL图像
+                processed_pil_image = Image.fromarray(processed_image)
+                
+                # 将图像保存到BytesIO对象
+                buffer = BytesIO()
+                processed_pil_image.save(buffer, format='PNG')
+                
+                # 转换为base64编码
+                preprocessed_image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                print("Preprocessed image converted to base64 successfully")
+            except Exception as e:
+                print(f"Error converting preprocessed image to base64: {str(e)}")
+                preprocessed_image_base64 = None
             
-            # 创建识别记录
-            recognition_record = RecognitionRecord(
-                user=request.user,
-                image=original_image_content,
-                preprocessed_image=preprocessed_image_content,
-                result=prediction_result['result'],
-                confidence=prediction_result['confidence'],
-                candidates=prediction_result['candidates']
-            )
-            recognition_record.save()
+            # 使用EasyOCR进行OCR
+            result = None
+            texts = []
+            confidences = []
             
-            # 序列化识别结果
-            result_serializer = RecognitionResultSerializer({
-                'result': prediction_result['result'],
-                'confidence': prediction_result['confidence'],
-                'candidates': prediction_result['candidates'],
-                'preprocessing_steps': ['grayscale', 'adaptive_binarize', 'denoise', 'resize', 'normalize'],
-                'preprocessed_image': prediction_result.get('preprocessed_image')
-            })
+            if self.reader:
+                try:
+                    result = self.reader.readtext(processed_image, batch_size=4)
+                    print(f"EasyOCR result: {result}")
+                    texts = []
+                    confidences = []
+                    if result and isinstance(result, list):
+                        for item in result:
+                            if isinstance(item, list) and len(item) >= 2:
+                                text = str(item[1]) if item[1] is not None else ''
+                                conf = float(item[2]) if len(item) > 2 and item[2] is not None else 0.0
+                                if text:
+                                    texts.append(text)
+                                    confidences.append(conf)
+                    print(f"Parsed texts: {texts}, confidences: {confidences}")
+                except Exception as e:
+                    print(f"Error during OCR processing: {str(e)}")
+                    texts, confidences = [], []
+            else:
+                print("EasyOCR not initialized, cannot perform recognition")
             
-            return Response(result_serializer.data, status=status.HTTP_200_OK)
-        
+            # 处理识别结果
+            predicted_char = ""
+            confidence = 0.0
+            candidates = []
+            
+            if texts:
+                best_text = texts[0]
+                best_confidence = confidences[0] if confidences else 0.85
+                print(f"Best OCR Result: '{best_text}' with confidence: {best_confidence}")
+                
+                predicted_char = best_text[0]
+                confidence = best_confidence
+                print(f"Selected character: '{predicted_char}'")
+                
+                candidates = [
+                    {'char': predicted_char, 'confidence': best_confidence}
+                ]
+                
+                if len(best_text) > 1:
+                    for i, char in enumerate(best_text[1:4]):
+                        if char and isinstance(char, str) and char.strip():
+                            candidates.append({
+                                'char': char,
+                                'confidence': round(best_confidence - (i+1)*0.05, 4)
+                            })
+            
+            print(f"Final result: char='{predicted_char}', confidence={confidence}, candidates_count={len(candidates)}")
+                
+            if not texts:
+                return Response(
+                    {'error': '未能识别出文字，请上传更清晰的手写图像'},
+                    status=status.HTTP_200_OK
+                )
+            
+            # 保存识别记录
+            try:
+                # 保存原始图像
+                original_image_name = f"original_{uuid.uuid4()}.png"
+                original_image_io = BytesIO()
+                image.save(original_image_io, format='PNG')
+                original_image_content = ContentFile(original_image_io.getvalue(), name=original_image_name)
+                
+                # 保存预处理后的图像
+                preprocessed_image_name = f"preprocessed_{uuid.uuid4()}.png"
+                preprocessed_image_content = None
+                if preprocessed_image_base64:
+                    preprocessed_image_data = base64.b64decode(preprocessed_image_base64)
+                    preprocessed_image_content = ContentFile(preprocessed_image_data, name=preprocessed_image_name)
+                
+                # 创建识别记录
+                recognition_record = RecognitionRecord(
+                    user=request.user,
+                    image=original_image_content,
+                    preprocessed_image=preprocessed_image_content,
+                    result=predicted_char,
+                    confidence=confidence,
+                    candidates=candidates
+                )
+                recognition_record.save()
+                print(f"Recognition record saved: {recognition_record.id}")
+            except Exception as e:
+                print(f"Error saving recognition record: {str(e)}")
+            
+            response_data = {
+                'result': predicted_char,
+                'confidence': round(float(confidence), 4),
+                'candidates': candidates,
+                'preprocessing_steps': ['grayscale', 'gaussian_blur', 'histogram_equalization'],
+                'preprocessed_image': preprocessed_image_base64
+            }
+            
+            print(f"Response data: {response_data}")
+            return Response(response_data, status=status.HTTP_200_OK)
+            
         except Exception as e:
+            print(f"识别过程中发生错误: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return Response(
-                {'error': f'识别过程中发生错误: {str(e)}'}, 
+                {'error': f'识别过程中发生错误: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -129,18 +246,33 @@ class RecognitionHistoryView(views.APIView):
         获取用户的识别历史记录
         
         Args:
-            request: HTTP请求对象，可包含分页参数
+            request: HTTP请求对象
             
         Returns:
             Response: 包含识别历史记录的HTTP响应
         """
-        # 获取用户的识别历史记录
-        records = RecognitionRecord.objects.filter(user=request.user).order_by('-created_at')
-        
-        # 序列化识别记录
-        serializer = RecognitionRecordSerializer(records, many=True)
-        
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        try:
+            # 获取用户的识别历史记录
+            records = RecognitionRecord.objects.filter(user=request.user).order_by('-created_at')
+            
+            # 构建响应数据
+            history_data = []
+            for record in records:
+                history_data.append({
+                    'id': record.id,
+                    'result': record.result,
+                    'confidence': record.confidence,
+                    'candidates': record.candidates,
+                    'created_at': record.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                })
+            
+            return Response(history_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Error loading history: {str(e)}")
+            return Response(
+                {'error': f'获取历史记录失败: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class RecognitionDetailView(views.APIView):
     """
@@ -164,141 +296,24 @@ class RecognitionDetailView(views.APIView):
             # 获取识别记录
             record = RecognitionRecord.objects.get(id=record_id, user=request.user)
             
-            # 序列化识别记录
-            serializer = RecognitionRecordSerializer(record)
+            # 构建响应数据
+            detail_data = {
+                'id': record.id,
+                'result': record.result,
+                'confidence': record.confidence,
+                'candidates': record.candidates,
+                'created_at': record.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            }
             
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(detail_data, status=status.HTTP_200_OK)
         except RecognitionRecord.DoesNotExist:
             return Response(
-                {'error': '识别记录不存在'}, 
+                {'error': '识别记录不存在'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            print(f"Error loading record detail: {str(e)}")
             return Response(
-                {'error': f'获取识别记录失败: {str(e)}'}, 
+                {'error': f'获取识别记录失败: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-class PreprocessingDemoView(views.APIView):
-    """
-    预处理演示视图
-    用于演示不同预处理步骤的效果
-    """
-    permission_classes = [IsAuthenticated]
-    
-    def post(self, request, *args, **kwargs):
-        """
-        演示图像预处理效果
-        
-        Args:
-            request: HTTP请求对象，包含上传的图像和预处理步骤
-            
-        Returns:
-            Response: 包含预处理结果的HTTP响应
-        """
-        # 检查请求类型
-        if 'image' in request.data:
-            # 常规图像上传
-            serializer = ImageUploadSerializer(data=request.data)
-        elif 'image_base64' in request.data:
-            # Base64图像上传
-            serializer = ImageBase64Serializer(data=request.data)
-        else:
-            return Response(
-                {'error': '请求中缺少image或image_base64字段'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 验证请求数据
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
-        # 获取预处理步骤
-        preprocessing_steps = serializer.validated_data.get('preprocessing_steps', None)
-        
-        # 获取图像
-        if 'image' in serializer.validated_data:
-            # 常规图像上传
-            image = Image.open(serializer.validated_data['image'])
-        else:
-            # Base64图像
-            image = serializer.validated_data['image_base64']
-        
-        try:
-            # 图像预处理
-            preprocessed_image, step_records = self.preprocessor.preprocess(image, preprocessing_steps)
-            
-            # 保存预处理后的图像
-            preprocessed_image_name = f"demo_preprocessed_{uuid.uuid4()}.png"
-            preprocessed_image_io = BytesIO()
-            preprocessed_image.save(preprocessed_image_io, format='PNG')
-            preprocessed_image_content = ContentFile(preprocessed_image_io.getvalue(), name=preprocessed_image_name)
-            
-            # 保存预处理后的图像到临时记录
-            # 注意：这里不保存完整的识别记录，只保存预处理后的图像用于演示
-            from django.core.files.storage import default_storage
-            preprocessed_image_path = default_storage.save(f"demo/{preprocessed_image_name}", preprocessed_image_content)
-            preprocessed_image_url = default_storage.url(preprocessed_image_path)
-            
-            return Response({
-                'preprocessing_steps': step_records,
-                'preprocessed_image_url': preprocessed_image_url
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as e:
-            return Response(
-                {'error': f'预处理演示失败: {str(e)}'}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-class ExportHistoryView(views.APIView):
-    """
-    导出历史记录视图
-    用于将识别历史导出为CSV格式
-    """
-    permission_classes = [IsAuthenticated]
-    
-    def get(self, request, *args, **kwargs):
-        """
-        导出识别历史为CSV文件
-        
-        Args:
-            request: HTTP请求对象
-            
-        Returns:
-            HttpResponse: CSV文件响应
-        """
-        # 获取用户的识别历史记录
-        records = RecognitionRecord.objects.filter(user=request.user).order_by('-created_at')
-        
-        # 创建HTTP响应，设置内容类型为CSV
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = f'attachment; filename="recognition_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv"'
-        
-        # 创建CSV写入器
-        writer = csv.writer(response)
-        
-        # 写入CSV表头
-        writer.writerow([
-            'ID', '识别结果', '置信度', '候选字', '预处理步骤', 
-            '原始图像URL', '预处理后图像URL', '创建时间'
-        ])
-        
-        # 写入数据行
-        for record in records:
-            # 处理候选字
-            candidates = '; '.join([f"{c['char']}({c['confidence']:.4f})" for c in record.candidates])
-            
-            # 写入一行数据
-            writer.writerow([
-                record.id,
-                record.result,
-                f"{record.confidence:.4f}",
-                candidates,
-                '; '.join(['grayscale', 'adaptive_binarize', 'denoise', 'center', 'resize', 'normalize']),  # 简化处理步骤
-                request.build_absolute_uri(record.image.url),
-                request.build_absolute_uri(record.preprocessed_image.url),
-                record.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            ])
-        
-        return response
