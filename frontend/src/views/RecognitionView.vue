@@ -36,26 +36,9 @@
         </div>
         
         <div class="result-area">
-          <!-- 识别结果标题和操作按钮 -->
+          <!-- 识别结果标题 -->
           <div class="result-header">
             <h2>识别结果</h2>
-            <div class="result-actions" v-if="recognitionResult">
-              <button class="btn btn-secondary" @click="copyResult">
-                <span class="btn-icon">📋</span> 复制
-              </button>
-              <button class="btn btn-secondary" @click="downloadResult">
-                <span class="btn-icon">💾</span> 下载
-              </button>
-            </div>
-          </div>
-          
-          <!-- 预处理图像预览 -->
-          <div v-if="preprocessedImage" class="preprocessed-image-preview">
-            <h3>OCR引擎处理后的图像</h3>
-            <div class="image-container">
-              <img :src="preprocessedImage" alt="预处理后的图像" class="preprocessed-image">
-            </div>
-            <p class="image-info">这是OCR引擎实际看到和处理的图像</p>
           </div>
           
           <!-- 识别结果卡片 -->
@@ -579,46 +562,11 @@ export default {
 }
 
 .result-actions {
-    display: flex;
-    gap: 0.5rem;
+    display: none;
 }
 
 .btn-icon {
     margin-right: 0.3rem;
-}
-
-.preprocessed-image-preview {
-    margin: 1rem 0;
-    padding: 1rem;
-    background: #f9fafb;
-    border-radius: 8px;
-    border: 1px solid #e5e7eb;
-}
-
-.preprocessed-image-preview h3 {
-    margin-top: 0;
-    color: #374151;
-    font-size: 1.1rem;
-}
-
-.image-container {
-    display: flex;
-    justify-content: center;
-    margin: 0.5rem 0;
-}
-
-.preprocessed-image {
-    max-width: 100%;
-    max-height: 200px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
-.image-info {
-    text-align: center;
-    color: #6b7280;
-    font-size: 0.9rem;
-    margin: 0.5rem 0 0;
 }
 
 .result-card {

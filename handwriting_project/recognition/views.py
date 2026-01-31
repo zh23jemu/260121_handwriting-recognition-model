@@ -136,9 +136,9 @@ class ImageRecognitionView(views.APIView):
                     print(f"EasyOCR result: {result}")
                     texts = []
                     confidences = []
-                    if result and isinstance(result, list):
+                    if result:
                         for item in result:
-                            if isinstance(item, list) and len(item) >= 2:
+                            if isinstance(item, (list, tuple)) and len(item) >= 2:
                                 text = str(item[1]) if item[1] is not None else ''
                                 conf = float(item[2]) if len(item) > 2 and item[2] is not None else 0.0
                                 if text:
