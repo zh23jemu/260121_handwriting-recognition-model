@@ -85,4 +85,8 @@ router.beforeEach((to, from, next) => {
   }
 })
 
+router.afterEach(() => {
+  window.dispatchEvent(new CustomEvent('auth-change'))
+})
+
 export default router

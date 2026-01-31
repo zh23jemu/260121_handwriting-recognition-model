@@ -68,6 +68,8 @@ export default {
         localStorage.setItem('username', user.username)
         localStorage.setItem('isAdmin', user.is_admin.toString())
         
+        window.dispatchEvent(new CustomEvent('auth-change'))
+        
         // 跳转到欢迎页面
         this.$router.push('/')
       } catch (err) {

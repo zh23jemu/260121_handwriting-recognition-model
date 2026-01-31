@@ -145,7 +145,7 @@ export default {
     initCanvas() {
       const canvas = this.$refs.canvas
       this.ctx = canvas.getContext('2d')
-      this.ctx.lineWidth = 24
+      this.ctx.lineWidth = 16
       this.ctx.lineCap = 'round'
       this.ctx.lineJoin = 'round'
       this.ctx.strokeStyle = '#000000'

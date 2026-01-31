@@ -23,6 +23,10 @@ export default {
   },
   mounted() {
     this.checkAuthStatus()
+    window.addEventListener('auth-change', this.checkAuthStatus)
+  },
+  beforeUnmount() {
+    window.removeEventListener('auth-change', this.checkAuthStatus)
   },
   methods: {
     checkAuthStatus() {
