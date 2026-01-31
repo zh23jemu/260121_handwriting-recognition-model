@@ -78,4 +78,4 @@ class RecognitionResultSerializer(serializers.Serializer):
         required=True,
         help_text='执行的预处理步骤'
     )
-    preprocessed_image = serializers.ImageField(read_only=True, help_text='预处理后的图像')
+    preprocessed_image = serializers.CharField(required=False, help_text='预处理后的图像（base64编码）')

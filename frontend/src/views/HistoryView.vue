@@ -215,7 +215,7 @@ export default {
         const token = localStorage.getItem('token')
         const response = await axios.get('http://localhost:8000/api/history/', {
           headers: {
-            'Authorization': `Token ${token}`
+            'Authorization': `Bearer ${token}`
           }
         })
         this.historyRecords = response.data
@@ -234,7 +234,7 @@ export default {
           const token = localStorage.getItem('token')
           await axios.delete(`http://localhost:8000/api/history/${recordId}/`, {
             headers: {
-              'Authorization': `Token ${token}`
+              'Authorization': `Bearer ${token}`
             }
           })
           // 重新加载历史记录
@@ -253,7 +253,7 @@ export default {
         const token = localStorage.getItem('token')
         const response = await axios.get('http://localhost:8000/api/export/', {
           headers: {
-            'Authorization': `Token ${token}`
+            'Authorization': `Bearer ${token}`
           },
           responseType: 'blob'
         })

@@ -72,11 +72,8 @@ class ImageRecognitionView(views.APIView):
             image = serializer.validated_data['image_base64']
         
         try:
-            # 图像预处理
-            preprocessed_image, step_records = self.preprocessor.preprocess(image, preprocessing_steps)
-            
-            # 模型预测
-            prediction_result = self.predictor.predict(preprocessed_image)
+            # 模型预测（直接使用原始图像，让predict方法自己处理预处理）
+            prediction_result = self.predictor.predict(image)
             
             # 保存原始图像
             original_image_name = f"original_{uuid.uuid4()}.png"
@@ -84,11 +81,13 @@ class ImageRecognitionView(views.APIView):
             image.save(original_image_io, format='PNG')
             original_image_content = ContentFile(original_image_io.getvalue(), name=original_image_name)
             
-            # 保存预处理后的图像
+            # 保存预处理后的图像（从prediction_result中获取）
             preprocessed_image_name = f"preprocessed_{uuid.uuid4()}.png"
-            preprocessed_image_io = BytesIO()
-            preprocessed_image.save(preprocessed_image_io, format='PNG')
-            preprocessed_image_content = ContentFile(preprocessed_image_io.getvalue(), name=preprocessed_image_name)
+            preprocessed_image_content = None
+            if prediction_result.get('preprocessed_image'):
+                import base64
+                preprocessed_image_data = base64.b64decode(prediction_result['preprocessed_image'])
+                preprocessed_image_content = ContentFile(preprocessed_image_data, name=preprocessed_image_name)
             
             # 创建识别记录
             recognition_record = RecognitionRecord(
@@ -106,8 +105,8 @@ class ImageRecognitionView(views.APIView):
                 'result': prediction_result['result'],
                 'confidence': prediction_result['confidence'],
                 'candidates': prediction_result['candidates'],
-                'preprocessing_steps': step_records,
-                'preprocessed_image': recognition_record.preprocessed_image
+                'preprocessing_steps': ['grayscale', 'adaptive_binarize', 'denoise', 'resize', 'normalize'],
+                'preprocessed_image': prediction_result.get('preprocessed_image')
             })
             
             return Response(result_serializer.data, status=status.HTTP_200_OK)

@@ -36,35 +36,76 @@
         </div>
         
         <div class="result-area">
-          <h2>识别结果</h2>
-          <div v-if="recognitionResult" class="result-card">
-            <div class="main-result">
-              <span class="result-label">识别结果：</span>
-              <span class="result-char">{{ recognitionResult.result }}</span>
-              <span class="result-confidence">({{ (recognitionResult.confidence * 100).toFixed(2) }}%)</span>
+          <!-- 识别结果标题和操作按钮 -->
+          <div class="result-header">
+            <h2>识别结果</h2>
+            <div class="result-actions" v-if="recognitionResult">
+              <button class="btn btn-secondary" @click="copyResult">
+                <span class="btn-icon">📋</span> 复制
+              </button>
+              <button class="btn btn-secondary" @click="downloadResult">
+                <span class="btn-icon">💾</span> 下载
+              </button>
             </div>
-            <div class="candidates">
-              <h3>候选字：</h3>
-              <div class="candidate-list">
-                <div 
-                  v-for="(candidate, index) in recognitionResult.candidates" 
-                  :key="index"
-                  class="candidate-item"
-                >
-                  <span class="candidate-char">{{ candidate.char }}</span>
-                  <span class="candidate-confidence">({{ (candidate.confidence * 100).toFixed(2) }}%)</span>
+          </div>
+          
+          <!-- 预处理图像预览 -->
+          <div v-if="preprocessedImage" class="preprocessed-image-preview">
+            <h3>OCR引擎处理后的图像</h3>
+            <div class="image-container">
+              <img :src="preprocessedImage" alt="预处理后的图像" class="preprocessed-image">
+            </div>
+            <p class="image-info">这是OCR引擎实际看到和处理的图像</p>
+          </div>
+          
+          <!-- 识别结果卡片 -->
+          <div v-if="recognitionResult" class="result-card">
+            <!-- 原始绘制图像 -->
+            <div class="original-image-preview">
+              <img :src="canvasImage" alt="原始绘制图像" class="original-image">
+            </div>
+            
+            <!-- 识别文字 -->
+            <div class="recognized-text-section">
+              <h3>识别文字:</h3>
+              <div class="recognized-text">
+                {{ recognitionResult.result }}
+              </div>
+            </div>
+            
+            <!-- 详细信息 -->
+            <div class="detailed-info-section">
+              <h3>详细信息:</h3>
+              <div class="detailed-info">
+                <div class="info-item">
+                  <span class="info-char">{{ recognitionResult.result }}</span>
+                  <span class="info-confidence">{{ (recognitionResult.confidence * 100).toFixed(1) }}%</span>
                 </div>
               </div>
             </div>
+            
+            <!-- 置信度进度条 -->
+            <div class="confidence-section">
+              <h3>置信度:</h3>
+              <div class="confidence-bar-container">
+                <div class="confidence-bar" :style="{ width: (recognitionResult.confidence * 100) + '%' }"></div>
+              </div>
+              <div class="confidence-value">{{ (recognitionResult.confidence * 100).toFixed(1) }}%</div>
+            </div>
           </div>
+          
+          <!-- 加载状态 -->
           <div v-else-if="isRecognizing" class="loading-state">
             <div class="loading-spinner"></div>
             <p>正在识别，请稍候...</p>
           </div>
+          
+          <!-- 空状态 -->
           <div v-else class="empty-result">
             <p>请在左侧绘制汉字，然后点击"开始识别"按钮</p>
           </div>
           
+          <!-- 错误信息 -->
           <div v-if="error" class="error-message">
             {{ error }}
           </div>
@@ -104,6 +145,8 @@ export default {
       isDrawing: false,
       isRecognizing: false,
       recognitionResult: null,
+      preprocessedImage: null,
+      canvasImage: null,
       error: '',
       recentHistory: [],
       ctx: null,
@@ -119,7 +162,7 @@ export default {
     initCanvas() {
       const canvas = this.$refs.canvas
       this.ctx = canvas.getContext('2d')
-      this.ctx.lineWidth = 8
+      this.ctx.lineWidth = 24
       this.ctx.lineCap = 'round'
       this.ctx.lineJoin = 'round'
       this.ctx.strokeStyle = '#000000'
@@ -190,6 +233,8 @@ export default {
       this.ctx.fillStyle = '#ffffff'
       this.ctx.fillRect(0, 0, canvas.width, canvas.height)
       this.recognitionResult = null
+      this.preprocessedImage = null
+      this.canvasImage = null
       this.error = ''
     },
     
@@ -222,10 +267,16 @@ export default {
       
       this.isRecognizing = true
       this.error = ''
+      this.preprocessedImage = null
       
       try {
-        // 将画布内容转换为Blob
+        // 将画布内容转换为Blob和DataURL
         const canvas = this.$refs.canvas
+        
+        // 保存画布图像用于显示
+        this.canvasImage = canvas.toDataURL('image/png')
+        
+        // 转换为Blob用于上传
         const blob = await new Promise((resolve) => {
           canvas.toBlob(resolve, 'image/png')
         })
@@ -257,6 +308,12 @@ export default {
         
         console.log('Recognition response:', response.data)
         this.recognitionResult = response.data
+        
+        // 处理预处理图像
+        if (response.data.preprocessed_image) {
+          this.preprocessedImage = `data:image/png;base64,${response.data.preprocessed_image}`
+        }
+        
         this.loadRecentHistory() // 更新历史记录
       } catch (err) {
         console.error('识别失败:', err)
@@ -264,6 +321,83 @@ export default {
         this.error = err.response?.data?.error || '识别失败，请重试'
       } finally {
         this.isRecognizing = false
+      }
+    },
+    
+    copyResult() {
+      if (this.recognitionResult) {
+        navigator.clipboard.writeText(this.recognitionResult.result)
+          .then(() => {
+            alert('识别结果已复制到剪贴板')
+          })
+          .catch(err => {
+            console.error('复制失败:', err)
+            alert('复制失败，请手动复制')
+          })
+      }
+    },
+    
+    downloadResult() {
+      if (this.recognitionResult && this.canvasImage) {
+        // 创建一个包含识别结果的HTML文件
+        const htmlContent = `
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>手写识别结果</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              .result-container { max-width: 500px; margin: 0 auto; }
+              .image-container { text-align: center; margin: 20px 0; }
+              .image-container img { border: 1px solid #ddd; padding: 10px; }
+              .result-section { margin: 20px 0; }
+              .result-text { font-size: 24px; font-weight: bold; text-align: center; margin: 10px 0; }
+              .confidence-section { margin: 10px 0; }
+              .confidence-bar { height: 10px; background-color: #e0e0e0; border-radius: 5px; overflow: hidden; }
+              .confidence-fill { height: 100%; background-color: #4a6cf7; }
+            </style>
+          </head>
+          <body>
+            <div class="result-container">
+              <h1>手写识别结果</h1>
+              <div class="image-container">
+                <h3>原始绘制</h3>
+                <img src="${this.canvasImage}" alt="原始绘制图像">
+              </div>
+              <div class="result-section">
+                <h3>识别文字</h3>
+                <div class="result-text">${this.recognitionResult.result}</div>
+              </div>
+              <div class="confidence-section">
+                <h3>置信度</h3>
+                <div class="confidence-bar">
+                  <div class="confidence-fill" style="width: ${(this.recognitionResult.confidence * 100)}%"></div>
+                </div>
+                <p>${(this.recognitionResult.confidence * 100).toFixed(1)}%</p>
+              </div>
+              <div class="info-section">
+                <h3>详细信息</h3>
+                <p>识别时间: ${new Date().toLocaleString()}</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `
+        
+        // 创建Blob对象
+        const blob = new Blob([htmlContent], { type: 'text/html' })
+        
+        // 创建下载链接
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `handwriting-recognition-${Date.now()}.html`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
       }
     },
     
@@ -430,67 +564,173 @@ export default {
   cursor: pointer;
 }
 
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.result-header h2 {
+    margin: 0;
+    color: #333;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 0.5rem;
+}
+
+.result-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-icon {
+    margin-right: 0.3rem;
+}
+
+.preprocessed-image-preview {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.preprocessed-image-preview h3 {
+    margin-top: 0;
+    color: #374151;
+    font-size: 1.1rem;
+}
+
+.image-container {
+    display: flex;
+    justify-content: center;
+    margin: 0.5rem 0;
+}
+
+.preprocessed-image {
+    max-width: 100%;
+    max-height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.image-info {
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.9rem;
+    margin: 0.5rem 0 0;
+}
+
 .result-card {
-  background: #f0f9ff;
-  border: 1px solid #3b82f6;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-top: 1rem;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.main-result {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+.original-image-preview {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
 }
 
-.result-label {
-  font-weight: bold;
-  color: #374151;
+.original-image {
+    max-width: 200px;
+    max-height: 200px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background: white;
 }
 
-.result-char {
-  font-size: 3rem;
-  font-weight: bold;
-  color: #1e40af;
+.recognized-text-section {
+    margin: 1.5rem 0;
 }
 
-.result-confidence {
-  font-size: 1.2rem;
-  color: #6b7280;
+.recognized-text-section h3 {
+    margin: 0 0 0.5rem;
+    color: #374151;
+    font-size: 1.1rem;
 }
 
-.candidates h3 {
-  margin-top: 0;
-  color: #374151;
+.recognized-text {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 1rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    color: #1e40af;
 }
 
-.candidate-list {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
+.detailed-info-section {
+    margin: 1.5rem 0;
 }
 
-.candidate-item {
-  background: white;
-  padding: 0.8rem;
-  border-radius: 5px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.detailed-info-section h3 {
+    margin: 0 0 0.5rem;
+    color: #374151;
+    font-size: 1.1rem;
 }
 
-.candidate-char {
-  font-size: 2rem;
-  font-weight: bold;
-  color: #3b82f6;
+.detailed-info {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 1rem;
 }
 
-.candidate-confidence {
-  font-size: 0.9rem;
-  color: #6b7280;
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-char {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #374151;
+}
+
+.info-confidence {
+    font-size: 1rem;
+    color: #10b981;
+    font-weight: bold;
+}
+
+.confidence-section {
+    margin: 1.5rem 0;
+}
+
+.confidence-section h3 {
+    margin: 0 0 0.5rem;
+    color: #374151;
+    font-size: 1.1rem;
+}
+
+.confidence-bar-container {
+    height: 10px;
+    background-color: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+
+.confidence-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4a6cf7, #667eea);
+    border-radius: 5px;
+    transition: width 0.3s ease;
+}
+
+.confidence-value {
+    text-align: right;
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin: 0.25rem 0 0;
 }
 
 .loading-state {
